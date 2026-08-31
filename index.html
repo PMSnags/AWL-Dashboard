@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AWL Status &amp; Rectification Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0e13;
+    --panel: #12161e;
+    --panel-border: #232936;
+    --text: #e6e9ef;
+    --muted: #8b93a3;
+    --red: #d0342c;
+    --red-soft: rgba(208,52,44,0.18);
+    --green: #2ecc71;
+    --amber: #f0a63a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    padding: 24px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: 0.3px;
+  }
+  h1 span { color: var(--red); }
+  .sub {
+    color: var(--muted);
+    font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .controls { display: flex; align-items: center; gap: 10px; }
+  button {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--red); }
+
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .kpi .value { font-size: 28px; font-weight: 700; }
+  .kpi .label { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .kpi.accent-red .value { color: var(--red); }
+  .kpi.accent-green .value { color: var(--green); }
+  .kpi.accent-amber .value { color: var(--amber); }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 900px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .panel h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    margin: 0 0 12px 0;
+    font-weight: 600;
+  }
+  .panel .chart-wrap { position: relative; height: 220px; }
+  .panel .chart-wrap.tall { height: 280px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--panel-border); }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.4px; }
+  td.num, th.num { text-align: right; font-family: 'IBM Plex Mono', monospace; }
+  tr:last-child td { border-bottom: none; }
+  tr.total-row td { font-weight: 700; border-top: 1px solid var(--panel-border); }
+
+  .rect-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .rect-bar-label { width: 70px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+  .rect-bar-track { flex: 1; background: #1c2230; border-radius: 4px; height: 14px; overflow: hidden; }
+  .rect-bar-fill { height: 100%; background: linear-gradient(90deg, var(--red), var(--amber)); border-radius: 4px; }
+  .rect-bar-pct { width: 48px; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 12px; flex-shrink: 0; }
+
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover td { background: rgba(208,52,44,0.10); }
+
+  .panel-header-row {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+  }
+  .panel-header-row h2 { margin: 0; }
+  select {
+    background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
+    padding: 6px 10px; border-radius: 6px; font-family: inherit; font-size: 12px;
+  }
+
+  #drilldown-panel { margin-top: 16px; }
+  #drilldown-title { font-size: 13px; font-weight: 600; }
+  #drilldown-count { color: var(--muted); font-size: 12px; margin-left: 8px; }
+  #drilldown-clear { font-size: 11px; padding: 5px 10px; }
+  #drilldown-empty { color: var(--muted); font-size: 12px; padding: 12px 0; }
+  .sev-red { color: var(--red); font-weight: 600; }
+  .sev-amber { color: var(--amber); font-weight: 600; }
+  .badge-critical {
+    display: inline-block; background: var(--red-soft); color: #ff8f87;
+    font-size: 10px; padding: 1px 6px; border-radius: 4px; margin-left: 6px;
+  }
+
+  #error-banner {
+    display: none;
+    background: var(--red-soft);
+    border: 1px solid var(--red);
+    color: #ffb4af;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    font-family: 'IBM Plex Mono', monospace;
+    white-space: pre-wrap;
+  }
+  #loading {
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AWL <span>Status &amp; Rectification</span> Dashboard</h1>
+    <div class="sub" id="last-updated">last updated: —</div>
+  </div>
+  <div class="controls">
+    <span class="sub" id="refresh-note">auto-refresh: 5 min</span>
+    <button id="refresh-btn">Refresh Now</button>
+  </div>
+</header>
+
+<div id="error-banner"></div>
+<div id="loading">Loading dashboard data...</div>
+<div id="dashboard" style="display:none;">
+
+  <div class="kpi-row" id="kpi-row"></div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <h2>Rectification Rate by Class</h2>
+      <div id="rect-rate-rows"></div>
+    </div>
+    <div class="panel">
+      <h2>Open NOT OK — Aging Backlog <span class="sub" style="text-transform:none;">(click a bar to drill in)</span></h2>
+      <div class="chart-wrap"><canvas id="aging-chart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <h2>Total Sites by Class <span class="sub" style="text-transform:none;">(click a row to drill in)</span></h2>
+      <table id="kpi-totals-table"></table>
+    </div>
+    <div class="panel">
+      <h2>Critical Sites by Class</h2>
+      <table id="kpi-critical-table"></table>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <h2>Region Breakdown <span class="sub" style="text-transform:none;">(click a row to drill in)</span></h2>
+      <table id="region-table"></table>
+    </div>
+    <div class="panel">
+      <h2>Region Rectification Rate</h2>
+      <div id="region-rect-rows"></div>
+      <h2 style="margin-top:16px;">Critical Sites by Region</h2>
+      <table id="region-critical-table"></table>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-header-row">
+        <h2>Coordinator Leaderboard</h2>
+        <select id="month-select"></select>
+      </div>
+      <div class="chart-wrap tall"><canvas id="coord-chart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Daily Checking Trend (last 30 days)</h2>
+      <div class="chart-wrap tall"><canvas id="trend-chart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="panel" id="drilldown-panel">
+    <div class="panel-header-row">
+      <div>
+        <span id="drilldown-title">All Open NOT OK Sites</span>
+        <span id="drilldown-count"></span>
+      </div>
+      <button id="drilldown-clear" style="display:none;">Clear filter</button>
+    </div>
+    <div id="drilldown-empty" style="display:none;">No sites match this filter.</div>
+    <table id="drilldown-table"></table>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// CONFIG — fill this in once your dashboard Google Sheet exists
+// ============================================================
+const CONFIG = {
+  SPREADSHEET_ID: "1b4GIe2HbXLpKJ74Syl6TXuACnfCuJMLwZT1k2JjmgMo",
+  REFRESH_INTERVAL_MINUTES: 5,
+};
+// ============================================================
+
+const CLASS_ORDER = ["Class A", "Class B", "Class C"];
+const AGING_ORDER = ["0-7", "8-14", "15-30", "31-60", "60+"];
+let charts = {};
+let openSnagsData = [];
+let coordinatorMonthlyData = [];
+let coordinatorAllTimeData = [];
+let currentFilter = { type: null, value: null };
+
+function csvUrl(sheetName) {
+  return `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
+}
+
+async function fetchTable(sheetName) {
+  const res = await fetch(csvUrl(sheetName));
+  if (!res.ok) {
+    throw new Error(`Could not fetch "${sheetName}" tab (HTTP ${res.status}). Check the Sheet ID and sharing settings.`);
+  }
+  const text = await res.text();
+  if (text.trim().startsWith("<")) {
+    throw new Error(`"${sheetName}" tab came back as HTML, not CSV — the Sheet is probably not shared as "Anyone with the link can view".`);
+  }
+  const parsed = Papa.parse(text, { header: true, dynamicTyping: true, skipEmptyLines: true });
+  return parsed.data;
+}
+
+function showError(msg) {
+  const banner = document.getElementById("error-banner");
+  banner.textContent = msg;
+  banner.style.display = "block";
+  document.getElementById("loading").style.display = "none";
+}
+
+function clearError() {
+  document.getElementById("error-banner").style.display = "none";
+}
+
+function fmtInt(n) {
+  return (n ?? 0).toLocaleString();
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function renderKpis(kpiTotals) {
+  const totalRow = kpiTotals.find(r => r.class === "Total") || {};
+  const row = document.getElementById("kpi-row");
+  const cards = [
+    { label: "Total Sites", value: totalRow.total, cls: "" },
+    { label: "OK", value: totalRow.ok, cls: "accent-green" },
+    { label: "NOT OK (open)", value: totalRow.not_ok, cls: "accent-red" },
+    { label: "Rectified", value: totalRow.rectified, cls: "accent-amber" },
+    { label: "Access Issue", value: totalRow.access_issue, cls: "" },
+  ];
+  row.innerHTML = cards.map(c => `
+    <div class="kpi ${c.cls}">
+      <div class="value">${fmtInt(c.value)}</div>
+      <div class="label">${c.label}</div>
+    </div>
+  `).join("");
+}
+
+function renderRectRates(kpiTotals) {
+  const container = document.getElementById("rect-rate-rows");
+  const rows = kpiTotals.filter(r => CLASS_ORDER.includes(r.class) || r.class === "Total");
+  container.innerHTML = rows.map(r => {
+    const denom = (r.not_ok || 0) + (r.rectified || 0);
+    const pct = denom > 0 ? Math.round((r.rectified / denom) * 100) : 0;
+    return `
+      <div class="rect-bar-row">
+        <div class="rect-bar-label">${r.class}</div>
+        <div class="rect-bar-track"><div class="rect-bar-fill" style="width:${pct}%"></div></div>
+        <div class="rect-bar-pct">${pct}%</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderTotalsTable(elId, rows, cols, clickable) {
+  const el = document.getElementById(elId);
+  const headHtml = `<tr><th>Class</th>${cols.map(c => `<th class="num">${c.label}</th>`).join("")}</tr>`;
+  const bodyHtml = rows.map(r => {
+    const isTotal = r.class === "Total";
+    const cls = [isTotal ? "total-row" : "", clickable && !isTotal ? "clickable" : ""].filter(Boolean).join(" ");
+    const click = clickable && !isTotal ? ` onclick="applyFilter('class', ${JSON.stringify(r.class)})"` : "";
+    return `<tr class="${cls}"${click}><td>${r.class}</td>${cols.map(c => `<td class="num">${fmtInt(r[c.key])}</td>`).join("")}</tr>`;
+  }).join("");
+  el.innerHTML = headHtml + bodyHtml;
+}
+
+function renderAgingChart(agingRows) {
+  const byBucket = Object.fromEntries(agingRows.map(r => [r.bucket, r.count]));
+  const data = AGING_ORDER.map(b => byBucket[b] || 0);
+  const colors = ["#2ecc71", "#f0a63a", "#e08a2b", "#d0342c", "#8b1a15"];
+
+  destroyChart("aging");
+  charts.aging = new Chart(document.getElementById("aging-chart"), {
+    type: "bar",
+    data: {
+      labels: AGING_ORDER.map(b => b + " days"),
+      datasets: [{ data, backgroundColor: colors, borderRadius: 4 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      onClick: (evt, elements) => {
+        if (elements.length) {
+          applyFilter("bucket", AGING_ORDER[elements[0].index]);
+        }
+      },
+      onHover: (evt, elements) => {
+        evt.native.target.style.cursor = elements.length ? "pointer" : "default";
+      },
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#8b93a3", font: { size: 11 } }, grid: { display: false } },
+        y: { ticks: { color: "#8b93a3" }, grid: { color: "#232936" } },
+      },
+    },
+  });
+}
+
+function renderRegionTable(regionRows) {
+  const el = document.getElementById("region-table");
+  const headHtml = `<tr><th>Region</th><th class="num">Total</th><th class="num">OK</th><th class="num">NOT OK</th><th class="num">Rectified</th></tr>`;
+  const bodyHtml = regionRows.map(r => `
+    <tr class="clickable" onclick="applyFilter('region', ${JSON.stringify(r.region)})">
+      <td>${r.region}</td><td class="num">${fmtInt(r.total)}</td><td class="num">${fmtInt(r.ok)}</td>
+      <td class="num">${fmtInt(r.not_ok)}</td><td class="num">${fmtInt(r.rectified)}</td>
+    </tr>
+  `).join("");
+  el.innerHTML = headHtml + bodyHtml;
+}
+
+function renderRegionRectRates(regionRows) {
+  const container = document.getElementById("region-rect-rows");
+  container.innerHTML = regionRows.map(r => {
+    const denom = (r.not_ok || 0) + (r.rectified || 0);
+    const pct = denom > 0 ? Math.round((r.rectified / denom) * 100) : 0;
+    return `
+      <div class="rect-bar-row">
+        <div class="rect-bar-label">${r.region}</div>
+        <div class="rect-bar-track"><div class="rect-bar-fill" style="width:${pct}%"></div></div>
+        <div class="rect-bar-pct">${pct}%</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderRegionCriticalTable(regionRows) {
+  const el = document.getElementById("region-critical-table");
+  const headHtml = `<tr><th>Region</th><th class="num">Critical</th><th class="num">NOT OK</th><th class="num">Rectified</th></tr>`;
+  const bodyHtml = regionRows.map(r => `
+    <tr><td>${r.region}</td><td class="num">${fmtInt(r.critical_total)}</td>
+    <td class="num">${fmtInt(r.critical_not_ok)}</td><td class="num">${fmtInt(r.critical_rectified)}</td></tr>
+  `).join("");
+  el.innerHTML = headHtml + bodyHtml;
+}
+
+function renderCoordinatorChart(rows) {
+  const top = rows.slice(0, 10);
+  destroyChart("coord");
+  charts.coord = new Chart(document.getElementById("coord-chart"), {
+    type: "bar",
+    data: {
+      labels: top.map(r => r.coordinator),
+      datasets: [{ data: top.map(r => r.sites_checked), backgroundColor: "#d0342c", borderRadius: 4 }],
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#8b93a3" }, grid: { color: "#232936" } },
+        y: { ticks: { color: "#e6e9ef", font: { size: 11 } }, grid: { display: false } },
+      },
+    },
+  });
+}
+
+function monthLabel(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "short", year: "numeric" });
+}
+
+function populateMonthSelect() {
+  const select = document.getElementById("month-select");
+  const months = [...new Set(coordinatorMonthlyData.map(r => r.month))].sort().reverse();
+  const options = [`<option value="__all__">All Time</option>`]
+    .concat(months.map(m => `<option value="${m}">${monthLabel(m)}</option>`));
+  select.innerHTML = options.join("");
+  select.value = months.length ? months[0] : "__all__";
+}
+
+function coordinatorRowsForMonth(month) {
+  if (month === "__all__") return coordinatorAllTimeData;
+  const rows = coordinatorMonthlyData
+    .filter(r => r.month === month)
+    .map(r => ({ coordinator: r.coordinator, sites_checked: r.sites_checked }))
+    .sort((a, b) => b.sites_checked - a.sites_checked);
+  return rows;
+}
+
+function onMonthChange() {
+  const month = document.getElementById("month-select").value;
+  renderCoordinatorChart(coordinatorRowsForMonth(month));
+}
+
+// ---- drill-down (site-level table) ----
+
+function bucketOfDays(days) {
+  if (days === "" || days === null || days === undefined) return null;
+  if (days <= 7) return "0-7";
+  if (days <= 14) return "8-14";
+  if (days <= 30) return "15-30";
+  if (days <= 60) return "31-60";
+  return "60+";
+}
+
+function applyFilter(type, value) {
+  currentFilter = { type, value };
+  renderDrilldown();
+  const panel = document.getElementById("drilldown-panel");
+  if (panel.scrollIntoView) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function clearFilter() {
+  currentFilter = { type: null, value: null };
+  renderDrilldown();
+}
+
+function renderDrilldown() {
+  let rows = openSnagsData;
+  let title = "All Open NOT OK Sites";
+
+  if (currentFilter.type === "class") {
+    rows = rows.filter(r => r.class === currentFilter.value);
+    title = `Open NOT OK Sites — ${currentFilter.value}`;
+  } else if (currentFilter.type === "region") {
+    rows = rows.filter(r => r.region === currentFilter.value);
+    title = `Open NOT OK Sites — Region ${currentFilter.value}`;
+  } else if (currentFilter.type === "bucket") {
+    rows = rows.filter(r => bucketOfDays(r.days_open) === currentFilter.value);
+    title = `Open NOT OK Sites — ${currentFilter.value} days open`;
+  }
+
+  document.getElementById("drilldown-title").textContent = title;
+  document.getElementById("drilldown-count").textContent = `(${rows.length} site${rows.length === 1 ? "" : "s"})`;
+  document.getElementById("drilldown-clear").style.display = currentFilter.type ? "inline-block" : "none";
+
+  const table = document.getElementById("drilldown-table");
+  const empty = document.getElementById("drilldown-empty");
+
+  if (rows.length === 0) {
+    table.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+
+  const headHtml = `<tr><th>Site ID</th><th>Region</th><th>Class</th><th>Coordinator</th><th class="num">Days Open</th><th>Issue</th></tr>`;
+  const bodyHtml = rows.map(r => {
+    const days = r.days_open;
+    const sevClass = days === "" ? "" : (days > 30 ? "sev-red" : (days > 14 ? "sev-amber" : ""));
+    const badge = r.critical === "Yes" ? '<span class="badge-critical">CRITICAL</span>' : "";
+    return `<tr>
+      <td>${r.site_id}${badge}</td><td>${r.region}</td><td>${r.class}</td><td>${r.coordinator}</td>
+      <td class="num ${sevClass}">${days === "" ? "?" : days}</td><td>${r.issue}</td>
+    </tr>`;
+  }).join("");
+  table.innerHTML = headHtml + bodyHtml;
+}
+
+function renderTrendChart(dayRows) {
+  destroyChart("trend");
+  charts.trend = new Chart(document.getElementById("trend-chart"), {
+    type: "line",
+    data: {
+      labels: dayRows.map(r => r.day),
+      datasets: [
+        { label: "Total Checked", data: dayRows.map(r => r.total), borderColor: "#d0342c", backgroundColor: "transparent", tension: 0.25 },
+        { label: "Class A", data: dayRows.map(r => r["Class A"]), borderColor: "#f0a63a", backgroundColor: "transparent", tension: 0.25 },
+        { label: "Class B", data: dayRows.map(r => r["Class B"]), borderColor: "#2ecc71", backgroundColor: "transparent", tension: 0.25 },
+        { label: "Class C", data: dayRows.map(r => r["Class C"]), borderColor: "#5aa9e6", backgroundColor: "transparent", tension: 0.25 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: "#e6e9ef", font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: "#8b93a3", font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: "#8b93a3" }, grid: { color: "#232936" } },
+      },
+    },
+  });
+}
+
+async function loadDashboard() {
+  clearError();
+  try {
+    const [meta, kpiTotals, kpiCritical, regions, coordinators, coordMonthly, aging, dayTrend, openSnags] = await Promise.all([
+      fetchTable("meta"),
+      fetchTable("kpi_totals"),
+      fetchTable("kpi_critical"),
+      fetchTable("region_breakdown"),
+      fetchTable("coordinators"),
+      fetchTable("coordinator_monthly"),
+      fetchTable("aging_open_not_ok"),
+      fetchTable("day_trend"),
+      fetchTable("open_snags"),
+    ]);
+
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("dashboard").style.display = "block";
+
+    document.getElementById("last-updated").textContent =
+      "last updated: " + (meta[0]?.last_updated || "unknown");
+
+    openSnagsData = openSnags;
+    coordinatorMonthlyData = coordMonthly;
+    coordinatorAllTimeData = coordinators;
+
+    renderKpis(kpiTotals);
+    renderRectRates(kpiTotals);
+    renderTotalsTable("kpi-totals-table", kpiTotals,
+      [{ key: "total", label: "Total" }, { key: "ok", label: "OK" },
+       { key: "not_ok", label: "NOT OK" }, { key: "rectified", label: "Rectified" },
+       { key: "access_issue", label: "Access Issue" }], true);
+    renderTotalsTable("kpi-critical-table", kpiCritical,
+      [{ key: "total", label: "Total" }, { key: "ok", label: "OK" },
+       { key: "not_ok", label: "NOT OK" }, { key: "rectified", label: "Rectified" }], false);
+    renderAgingChart(aging);
+    renderRegionTable(regions);
+    renderRegionRectRates(regions);
+    renderRegionCriticalTable(regions);
+    populateMonthSelect();
+    renderCoordinatorChart(coordinatorRowsForMonth(document.getElementById("month-select").value));
+    renderTrendChart(dayTrend);
+    renderDrilldown();
+  } catch (err) {
+    showError(
+      "Couldn't load dashboard data:\n" + err.message +
+      "\n\nCheck: (1) CONFIG.SPREADSHEET_ID is set correctly, " +
+      "(2) the Sheet is shared as \"Anyone with the link can view\", " +
+      "(3) Publish Dashboard has been run at least once from the toolkit."
+    );
+  }
+}
+
+document.getElementById("refresh-btn").addEventListener("click", loadDashboard);
+document.getElementById("month-select").addEventListener("change", onMonthChange);
+document.getElementById("drilldown-clear").addEventListener("click", clearFilter);
+loadDashboard();
+setInterval(loadDashboard, CONFIG.REFRESH_INTERVAL_MINUTES * 60 * 1000);
+</script>
+
+</body>
+</html>
