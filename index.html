@@ -77,6 +77,8 @@
   .kpi.accent-red .value { color: var(--red); }
   .kpi.accent-green .value { color: var(--green); }
   .kpi.accent-amber .value { color: var(--amber); }
+  .kpi.clickable-kpi { cursor: pointer; transition: border-color 0.15s; }
+  .kpi.clickable-kpi:hover { border-color: var(--red); }
 
   .grid-2 {
     display: grid;
@@ -309,14 +311,14 @@ function renderKpis(kpiTotals) {
   const cards = [
     { label: "Total Sites", value: totalRow.total, cls: "" },
     { label: "OK", value: totalRow.ok, cls: "accent-green" },
-    { label: "NOT OK (open)", value: totalRow.not_ok, cls: "accent-red" },
+    { label: "NOT OK (open)", value: totalRow.not_ok, cls: "accent-red", click: "showAllOpenSites()" },
     { label: "Rectified", value: totalRow.rectified, cls: "accent-amber" },
     { label: "Access Issue", value: totalRow.access_issue, cls: "" },
   ];
   row.innerHTML = cards.map(c => `
-    <div class="kpi ${c.cls}">
+    <div class="kpi ${c.cls}${c.click ? " clickable-kpi" : ""}"${c.click ? ` onclick="${c.click}"` : ""}>
       <div class="value">${fmtInt(c.value)}</div>
-      <div class="label">${c.label}</div>
+      <div class="label">${c.label}${c.click ? " \u2192" : ""}</div>
     </div>
   `).join("");
 }
@@ -482,6 +484,10 @@ function applyFilter(type, value) {
   renderDrilldown();
   const panel = document.getElementById("drilldown-panel");
   if (panel.scrollIntoView) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function showAllOpenSites() {
+  applyFilter(null, null);
 }
 
 function clearFilter() {
