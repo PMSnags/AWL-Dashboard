@@ -2,623 +2,190 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>AWL Status &amp; Rectification Dashboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Open AWL Snags — Site Class & Criticality</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
   :root {
-    --bg: #0b0e13;
-    --panel: #12161e;
-    --panel-border: #232936;
-    --text: #e6e9ef;
-    --muted: #8b93a3;
-    --red: #d0342c;
-    --red-soft: rgba(208,52,44,0.18);
-    --green: #2ecc71;
-    --amber: #f0a63a;
+    --bg: #0d1117; --surface: #161b22; --border: #21262d; --text: #e6edf3;
+    --muted: #7d8590; --class-a: #58a6ff; --class-b: #d29922; --class-c: #6e7681;
+    --critical-yes: #f85149; --critical-no: #3fb950; --header-bg: #1c2128;
+    --row-hover: #1f2937; --accent: #388bfd;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'IBM Plex Sans', sans-serif;
-    padding: 24px;
-  }
-  header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  h1 {
-    font-size: 20px;
-    font-weight: 700;
-    margin: 0;
-    letter-spacing: 0.3px;
-  }
-  h1 span { color: var(--red); }
-  .sub {
-    color: var(--muted);
-    font-size: 12px;
-    font-family: 'IBM Plex Mono', monospace;
-  }
-  .controls { display: flex; align-items: center; gap: 10px; }
-  button {
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    color: var(--text);
-    padding: 8px 14px;
-    border-radius: 6px;
-    font-family: inherit;
-    font-size: 12px;
-    cursor: pointer;
-  }
-  button:hover { border-color: var(--red); }
-
-  .kpi-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 12px;
-    margin-bottom: 20px;
-  }
-  .kpi {
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    border-radius: 10px;
-    padding: 16px;
-  }
-  .kpi .value { font-size: 28px; font-weight: 700; }
-  .kpi .label { color: var(--muted); font-size: 12px; margin-top: 4px; }
-  .kpi.accent-red .value { color: var(--red); }
-  .kpi.accent-green .value { color: var(--green); }
-  .kpi.accent-amber .value { color: var(--amber); }
-  .kpi.clickable-kpi { cursor: pointer; transition: border-color 0.15s; }
-  .kpi.clickable-kpi:hover { border-color: var(--red); }
-
-  .grid-2 {
-    display: grid;
-    grid-template-columns: 1.3fr 1fr;
-    gap: 16px;
-    margin-bottom: 16px;
-  }
-  .grid-3 {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 16px;
-  }
-  @media (max-width: 900px) {
-    .grid-2, .grid-3 { grid-template-columns: 1fr; }
-  }
-
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    border-radius: 10px;
-    padding: 16px;
-  }
-  .panel h2 {
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--muted);
-    margin: 0 0 12px 0;
-    font-weight: 600;
-  }
-  .panel .chart-wrap { position: relative; height: 220px; }
-  .panel .chart-wrap.tall { height: 280px; }
-
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--panel-border); }
-  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.4px; }
-  td.num, th.num { text-align: right; font-family: 'IBM Plex Mono', monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; min-height: 100vh; padding: 32px 24px; }
+  .header { margin-bottom: 28px; }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; color: var(--text); margin-bottom: 6px; }
+  .header p { color: var(--muted); font-size: 13px; }
+  .summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 20px; min-width: 130px; flex: 1; }
+  .card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .card .value { font-family: 'IBM Plex Mono', monospace; font-size: 26px; font-weight: 600; color: var(--text); }
+  .card.red .value { color: var(--critical-yes); }
+  .card.blue .value { color: var(--class-a); }
+  .card.amber .value { color: var(--class-b); }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+  .filter-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .filter-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-right: 2px; }
+  .btn { padding: 5px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; cursor: pointer; transition: all 0.15s ease; white-space: nowrap; }
+  .btn:hover { border-color: var(--accent); color: var(--text); }
+  .btn.active { background: var(--accent); border-color: var(--accent); color: white; font-weight: 600; }
+  .search-wrap { flex: 1; max-width: 280px; position: relative; }
+  .search-wrap input { width: 100%; padding: 6px 12px 6px 32px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; outline: none; transition: border-color 0.15s; }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap input::placeholder { color: var(--muted); }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; pointer-events: none; }
+  .table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: var(--header-bg); }
+  th { padding: 11px 14px; text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.7px; white-space: nowrap; cursor: pointer; user-select: none; border-bottom: 1px solid var(--border); }
+  th:hover { color: var(--text); }
+  th .sort-arrow { margin-left: 5px; opacity: 0.4; font-size: 10px; }
+  th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 13px; }
   tr:last-child td { border-bottom: none; }
-  tr.total-row td { font-weight: 700; border-top: 1px solid var(--panel-border); }
-
-  .rect-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-  .rect-bar-label { width: 70px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
-  .rect-bar-track { flex: 1; background: #1c2230; border-radius: 4px; height: 14px; overflow: hidden; }
-  .rect-bar-fill { height: 100%; background: linear-gradient(90deg, var(--red), var(--amber)); border-radius: 4px; }
-  .rect-bar-pct { width: 48px; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 12px; flex-shrink: 0; }
-
-  tr.clickable { cursor: pointer; }
-  tr.clickable:hover td { background: rgba(208,52,44,0.10); }
-
-  .panel-header-row {
-    display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
-  }
-  .panel-header-row h2 { margin: 0; }
-  select {
-    background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
-    padding: 6px 10px; border-radius: 6px; font-family: inherit; font-size: 12px;
-  }
-
-  #drilldown-panel { margin-top: 16px; }
-  #drilldown-title { font-size: 13px; font-weight: 600; }
-  #drilldown-count { color: var(--muted); font-size: 12px; margin-left: 8px; }
-  #drilldown-clear { font-size: 11px; padding: 5px 10px; }
-  #drilldown-empty { color: var(--muted); font-size: 12px; padding: 12px 0; }
-  .sev-red { color: var(--red); font-weight: 600; }
-  .sev-amber { color: var(--amber); font-weight: 600; }
-  .badge-critical {
-    display: inline-block; background: var(--red-soft); color: #ff8f87;
-    font-size: 10px; padding: 1px 6px; border-radius: 4px; margin-left: 6px;
-  }
-
-  #error-banner {
-    display: none;
-    background: var(--red-soft);
-    border: 1px solid var(--red);
-    color: #ffb4af;
-    padding: 12px 16px;
-    border-radius: 8px;
-    margin-bottom: 16px;
-    font-size: 13px;
-    font-family: 'IBM Plex Mono', monospace;
-    white-space: pre-wrap;
-  }
-  #loading {
-    color: var(--muted);
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 13px;
-  }
+  tbody tr { transition: background 0.1s; }
+  tbody tr:hover { background: var(--row-hover); }
+  tr.group-header td { background: #1a1f29; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 7px 14px; border-bottom: 1px solid var(--border); }
+  tr.group-header:hover { background: #1a1f29; }
+  .site-id { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 12.5px; color: var(--text); }
+  .badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; white-space: nowrap; }
+  .badge-a { background: rgba(88,166,255,0.12); color: var(--class-a); border: 1px solid rgba(88,166,255,0.25); }
+  .badge-b { background: rgba(210,153,34,0.12); color: var(--class-b); border: 1px solid rgba(210,153,34,0.25); }
+  .badge-c { background: rgba(110,118,129,0.12); color: #a0aab5; border: 1px solid rgba(110,118,129,0.25); }
+  .badge-crit { background: rgba(248,81,73,0.12); color: var(--critical-yes); border: 1px solid rgba(248,81,73,0.25); }
+  .badge-ncrit { background: rgba(63,185,80,0.08); color: var(--critical-no); border: 1px solid rgba(63,185,80,0.2); }
+  .badge-region { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; background: rgba(56,139,253,0.1); color: #79c0ff; border: 1px solid rgba(56,139,253,0.2); }
+  .badge-type { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); background: rgba(255,255,255,0.04); border: 1px solid var(--border); padding: 2px 7px; border-radius: 4px; }
+  .issue-text { color: var(--muted); font-size: 12px; max-width: 320px; line-height: 1.4; display: block; }
+  .issue-text.has-issue { color: #c9a227; }
+  .date-text { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); }
+  .no-results { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+  .result-count { font-size: 12px; color: var(--muted); margin-left: auto; align-self: center; }
+  .result-count span { color: var(--text); font-weight: 600; }
 </style>
 </head>
 <body>
-
-<header>
-  <div>
-    <h1>AWL <span>Status &amp; Rectification</span> Dashboard</h1>
-    <div class="sub" id="last-updated">last updated: —</div>
-  </div>
-  <div class="controls">
-    <span class="sub" id="refresh-note">auto-refresh: 5 min</span>
-    <button id="refresh-btn">Refresh Now</button>
-  </div>
-</header>
-
-<div id="error-banner"></div>
-<div id="loading">Loading dashboard data...</div>
-<div id="dashboard" style="display:none;">
-
-  <div class="kpi-row" id="kpi-row"></div>
-
-  <div class="grid-2">
-    <div class="panel">
-      <h2>Rectification Rate by Class</h2>
-      <div id="rect-rate-rows"></div>
-    </div>
-    <div class="panel">
-      <h2>Open NOT OK — Aging Backlog <span class="sub" style="text-transform:none;">(click a bar to drill in)</span></h2>
-      <div class="chart-wrap"><canvas id="aging-chart"></canvas></div>
-    </div>
-  </div>
-
-  <div class="grid-2">
-    <div class="panel">
-      <h2>Total Sites by Class <span class="sub" style="text-transform:none;">(click a row to drill in)</span></h2>
-      <table id="kpi-totals-table"></table>
-    </div>
-    <div class="panel">
-      <h2>Critical Sites by Class</h2>
-      <table id="kpi-critical-table"></table>
-    </div>
-  </div>
-
-  <div class="grid-2">
-    <div class="panel">
-      <h2>Region Breakdown <span class="sub" style="text-transform:none;">(click a row to drill in)</span></h2>
-      <table id="region-table"></table>
-    </div>
-    <div class="panel">
-      <h2>Region Rectification Rate</h2>
-      <div id="region-rect-rows"></div>
-      <h2 style="margin-top:16px;">Critical Sites by Region</h2>
-      <table id="region-critical-table"></table>
-    </div>
-  </div>
-
-  <div class="grid-2">
-    <div class="panel">
-      <div class="panel-header-row">
-        <h2>Coordinator Leaderboard</h2>
-        <select id="month-select"></select>
-      </div>
-      <div class="chart-wrap tall"><canvas id="coord-chart"></canvas></div>
-    </div>
-    <div class="panel">
-      <h2>Daily Checking Trend (last 30 days)</h2>
-      <div class="chart-wrap tall"><canvas id="trend-chart"></canvas></div>
-    </div>
-  </div>
-
-  <div class="panel" id="drilldown-panel">
-    <div class="panel-header-row">
-      <div>
-        <span id="drilldown-title">All Open NOT OK Sites</span>
-        <span id="drilldown-count"></span>
-      </div>
-      <button id="drilldown-clear" style="display:none;">Clear filter</button>
-    </div>
-    <div id="drilldown-empty" style="display:none;">No sites match this filter.</div>
-    <table id="drilldown-table"></table>
-  </div>
-
+<div class="header">
+  <h1>Open AWL Snags — Site Class &amp; Criticality</h1>
+  <p>287 open snags</p>
 </div>
-
+<div class="summary">
+  <div class="card"><div class="label">Total Open</div><div class="value">287</div></div>
+  <div class="card red"><div class="label">Critical</div><div class="value">5</div></div>
+  <div class="card blue"><div class="label">Class A</div><div class="value">11</div></div>
+  <div class="card amber"><div class="label">Class B</div><div class="value">6</div></div>
+  <div class="card"><div class="label">Class C</div><div class="value">270</div></div>
+</div>
+<div class="controls">
+  <div class="filter-group">
+    <span class="filter-label">Class</span>
+    <button class="btn active" onclick="setFilter('class','all',this)">All</button>
+    <button class="btn" onclick="setFilter('class','Class A',this)">Class A</button>
+    <button class="btn" onclick="setFilter('class','Class B',this)">Class B</button>
+    <button class="btn" onclick="setFilter('class','Class C',this)">Class C</button>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Critical</span>
+    <button class="btn active" onclick="setFilter('critical','all',this)">All</button>
+    <button class="btn" onclick="setFilter('critical','Yes',this)">Critical Only</button>
+    <button class="btn" onclick="setFilter('critical','No',this)">Non-Critical</button>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Region</span>
+    <button class="btn active" onclick="setFilter('region','all',this)">All</button>
+    <button class="btn" onclick="setFilter('region','AUH',this)">AUH</button>
+    <button class="btn" onclick="setFilter('region','NE',this)">NE</button>
+    <button class="btn" onclick="setFilter('region','DXB',this)">DXB</button>
+  </div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="searchInput" placeholder="Search site ID or issue…" oninput="renderTable()">
+  </div>
+  <div class="result-count" id="resultCount"></div>
+</div>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th onclick="sortBy('SITE ID')">Site ID <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('REGION')">Region <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('SITE CLASS')">Site Class <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('SITE TYPE')">Type <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('Critical')">Critical <span class="sort-arrow">↕</span></th>
+        <th>Issue</th>
+        <th onclick="sortBy('Last Visit')">Last Visit <span class="sort-arrow">↕</span></th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
 <script>
-// ============================================================
-// CONFIG — fill this in once your dashboard Google Sheet exists
-// ============================================================
-const CONFIG = {
-  SPREADSHEET_ID: "1b4GIe2HbXLpKJ74Syl6TXuACnfCuJMLwZT1k2JjmgMo",
-  REFRESH_INTERVAL_MINUTES: 5,
-};
-// ============================================================
+const TOTAL = 287;
+const HAS_LV = true;
+const data = [{"SITE ID": "AAN2399", "REGION": "AUH", "SITE CLASS": "Class A", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-03-17"}, {"SITE ID": "AUH2122", "REGION": "AUH", "SITE CLASS": "Class A", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-04-14"}, {"SITE ID": "AUH2912", "REGION": "AUH", "SITE CLASS": "Class A", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL Not working", "Last Visit": "2026-01-19"}, {"SITE ID": "AUH2916", "REGION": "AUH", "SITE CLASS": "Class A", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-12-25"}, {"SITE ID": "DXB1022", "REGION": "DXB", "SITE CLASS": "Class A", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-03-14"}, {"SITE ID": "DXB1475", "REGION": "DXB", "SITE CLASS": "Class A", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL SATANDBY BULB FAULTY NEED TO REPLACE(WIND SPEED HIGH DURING PM)", "Last Visit": "2026-04-16"}, {"SITE ID": "DXB1635", "REGION": "DXB", "SITE CLASS": "Class A", "SITE TYPE": "GFR", "Critical": "No", "Issue if NOK": "TOWER TOPSIDE AWL CABLE DAMAGED AND FOUND CONNECTED DIRECTLY. (ONLY MAIN BULB IS WORKING)", "Last Visit": "2026-04-16"}, {"SITE ID": "DXB1828", "REGION": "DXB", "SITE CLASS": "Class A", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2026-01-22"}, {"SITE ID": "AJM2304", "REGION": "NE", "SITE CLASS": "Class A", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check out door.", "Last Visit": "2026-01-09"}, {"SITE ID": "AJM2751", "REGION": "NE", "SITE CLASS": "Class A", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL lamp in the middle part of the tower is working, but the lamp in the upper part is not working.", "Last Visit": "2026-01-13"}, {"SITE ID": "SHJ2325", "REGION": "NE", "SITE CLASS": "Class A", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-04-14"}, {"SITE ID": "AUH2408", "REGION": "AUH", "SITE CLASS": "Class B", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2026-01-05"}, {"SITE ID": "AUH3176", "REGION": "AUH", "SITE CLASS": "Class B", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamps", "Last Visit": "2026-01-03"}, {"SITE ID": "DXB1082", "REGION": "DXB", "SITE CLASS": "Class B", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-01-10"}, {"SITE ID": "FUJ2150", "REGION": "NE", "SITE CLASS": "Class B", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-02-03"}, {"SITE ID": "SHJ2474", "REGION": "NE", "SITE CLASS": "Class B", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": " Site Visit Update\nSite visited. AWL light not working. Panel reset checked. Further troubleshooting required to check photocell or bulb during daytime. ", "Last Visit": "2025-12-23"}, {"SITE ID": "UAQ2807", "REGION": "NE", "SITE CLASS": "Class B", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL is not working on this site due to faulty photocell, now the photocell has been bypassed and the lamps are working fine. \nThe photocell needs to be replaced.", "Last Visit": "2025-12-13"}, {"SITE ID": "AAN2017", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-11-21"}, {"SITE ID": "AAN2024", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL Both Lamp Faulty ", "Last Visit": "2026-02-16"}, {"SITE ID": "AAN2026", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "lamp faulty", "Last Visit": "2025-07-16"}, {"SITE ID": "AAN2034", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-11-05"}, {"SITE ID": "AAN2252", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-02-26"}, {"SITE ID": "AAN2264", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-09-26"}, {"SITE ID": "AAN2283", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-01-14"}, {"SITE ID": "AAN2293", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL lamp faulty", "Last Visit": "2025-12-15"}, {"SITE ID": "AAN2297", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "power disconnected from MDB light not working", "Last Visit": "2025-12-15"}, {"SITE ID": "AAN2308", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-12-03"}, {"SITE ID": "AAN2317", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-01-13"}, {"SITE ID": "AAN2322", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-12-03"}, {"SITE ID": "AAN2332", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check at tower", "Last Visit": "2025-11-29"}, {"SITE ID": "AAN2335", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-01-29"}, {"SITE ID": "AAN2338", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-12-03"}, {"SITE ID": "AAN2340", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-11-05"}, {"SITE ID": "AAN2393", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL card faulty", "Last Visit": "2026-01-27"}, {"SITE ID": "AAN2396", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL card faulty", "Last Visit": "2026-01-27"}, {"SITE ID": "AAN2432", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL Lamp not working", "Last Visit": "2025-12-03"}, {"SITE ID": "AAN2458", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-11-22"}, {"SITE ID": "AAN2465", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL Light in 30 meter not working,AWL in 60 meter working", "Last Visit": "2025-10-22"}, {"SITE ID": "AAN2489", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-12-06"}, {"SITE ID": "AAN2492", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL Light in 30 meter not working,AWL in 60 meter working", "Last Visit": "2026-01-26"}, {"SITE ID": "AAN2512", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL card is faulty", "Last Visit": "2026-01-08"}, {"SITE ID": "AAN2534", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-11-03"}, {"SITE ID": "AAN2548", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Photocell dfault", "Last Visit": "2025-10-23"}, {"SITE ID": "AAN2549", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-01-07"}, {"SITE ID": "AAN2614", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL card tech 15 Photo cell Port faulty", "Last Visit": "2026-01-15"}, {"SITE ID": "AAN2842", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-12-18"}, {"SITE ID": "AAN2844", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-10-01"}, {"SITE ID": "AAN2852", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "photo cell faulty", "Last Visit": "2025-12-04"}, {"SITE ID": "AAN2890", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-11-12"}, {"SITE ID": "AAN3113", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-11-01"}, {"SITE ID": "AAN3118", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-12-15"}, {"SITE ID": "AAN3139", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-12-17"}, {"SITE ID": "AAN3160", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check light", "Last Visit": "2025-10-24"}, {"SITE ID": "AAN3165", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check light", "Last Visit": "2025-11-26"}, {"SITE ID": "AAN3291", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check outdoor", "Last Visit": "2025-11-26"}, {"SITE ID": "AAN3428", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-01-24"}, {"SITE ID": "AAN3435", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL not working", "Last Visit": "2026-01-14"}, {"SITE ID": "AAN3532", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-01-17"}, {"SITE ID": "AAN3537", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-11-25"}, {"SITE ID": "AAN3589", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-10-31"}, {"SITE ID": "AAN3654", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check tower", "Last Visit": "2025-11-13"}, {"SITE ID": "AUG4289", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GRD", "Critical": "No", "Issue if NOK": "Site Dismantled", "Last Visit": "\u2014"}, {"SITE ID": "AUG4317", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GRD", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2026-01-31"}, {"SITE ID": "AUG4365", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-12-18"}, {"SITE ID": "AUG4418", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-12-18"}, {"SITE ID": "AUG4442", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GRD", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "\u2014"}, {"SITE ID": "AUG4447", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GRD", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-10-16"}, {"SITE ID": "AUG6018", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GRD", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-12-05"}, {"SITE ID": "AUG6019", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2026-04-14"}, {"SITE ID": "AUG6020", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-12-24"}, {"SITE ID": "AUG6035", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-09-26"}, {"SITE ID": "AUG6037", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-02-05"}, {"SITE ID": "AUG6050", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-11-07"}, {"SITE ID": "AUG6056", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor lamp", "Last Visit": "2025-11-12"}, {"SITE ID": "AUG6058", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor lamp", "Last Visit": "2025-11-29"}, {"SITE ID": "AUG6081", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2026-03-13"}, {"SITE ID": "AUG6084", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-12-08"}, {"SITE ID": "AUG6104", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-12-23"}, {"SITE ID": "AUG6181", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "COW", "Critical": "No", "Issue if NOK": "AWL -Not applicable,Temp site,Not On air", "Last Visit": "\u2014"}, {"SITE ID": "AUH2028", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-10-08"}, {"SITE ID": "AUH2059", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-09-23"}, {"SITE ID": "AUH2067", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-12-05"}, {"SITE ID": "AUH2073", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-09-30"}, {"SITE ID": "AUH2083", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-10-08"}, {"SITE ID": "AUH2103", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-12-13"}, {"SITE ID": "AUH2107", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-12-05"}, {"SITE ID": "AUH2124", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-10-08"}, {"SITE ID": "AUH2126", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-10-07"}, {"SITE ID": "AUH2130", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-12-10"}, {"SITE ID": "AUH2147", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-10-03"}, {"SITE ID": "AUH2150", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-09-29"}, {"SITE ID": "AUH2183", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "PHotocell faulty", "Last Visit": "2025-10-13"}, {"SITE ID": "AUH2201", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-11-21"}, {"SITE ID": "AUH2237", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2026-01-16"}, {"SITE ID": "AUH2264", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-09-04"}, {"SITE ID": "AUH2267", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL card faulty", "Last Visit": "2025-09-26"}, {"SITE ID": "AUH2317", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-10-10"}, {"SITE ID": "AUH2350", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need check outdoor", "Last Visit": "2025-12-10"}, {"SITE ID": "AUH2411", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-07-22"}, {"SITE ID": "AUH2425", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-09-22"}, {"SITE ID": "AUH2459", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-09-23"}, {"SITE ID": "AUH2478", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-01-26"}, {"SITE ID": "AUH2480", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL inverter Faulty TECH15 Card", "Last Visit": "2026-01-29"}, {"SITE ID": "AUH2481", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-09-23"}, {"SITE ID": "AUH2488", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Awl card faulty 186c  tech", "Last Visit": "2026-01-29"}, {"SITE ID": "AUH2555", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-02-27"}, {"SITE ID": "AUH2572", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "NO AWL for this site - Water tank site", "Last Visit": "2025-11-27"}, {"SITE ID": "AUH2573", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "NO AWL for this site - Water tank site", "Last Visit": "2025-11-27"}, {"SITE ID": "AUH2574", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "NO AWL for this site - Water tank site", "Last Visit": "2025-11-27"}, {"SITE ID": "AUH2575", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "NO AWL for this site - Water tank site", "Last Visit": "2025-11-27"}, {"SITE ID": "AUH2623", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-09-18"}, {"SITE ID": "AUH2632", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-11-03"}, {"SITE ID": "AUH2661", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-12-26"}, {"SITE ID": "AUH2722", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Lamps faulty", "Last Visit": "2025-12-12"}, {"SITE ID": "AUH2765", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-04-02"}, {"SITE ID": "AUH2775", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL card faulty", "Last Visit": "2025-09-19"}, {"SITE ID": "AUH2777", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to checklamp", "Last Visit": "2025-12-17"}, {"SITE ID": "AUH2786", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-12-13"}, {"SITE ID": "AUH2792", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-09-20"}, {"SITE ID": "AUH2849", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-10-18"}, {"SITE ID": "AUH2902", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamps", "Last Visit": "2025-09-27"}, {"SITE ID": "AUH2907", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Both lamp faulty", "Last Visit": "2025-12-16"}, {"SITE ID": "AUH2928", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-08-22"}, {"SITE ID": "AUH2935", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "card faulty", "Last Visit": "2025-08-23"}, {"SITE ID": "AUH2956", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Suspected both Lamp Faulty need to check at Tower end", "Last Visit": "2025-09-26"}, {"SITE ID": "AUH2959", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2026-01-19"}, {"SITE ID": "AUH2961", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-09-29"}, {"SITE ID": "AUH2965", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-12-06"}, {"SITE ID": "AUH2989", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-07-24"}, {"SITE ID": "AUH3042", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL Panel TECH-186C Card faulty (both lamps output power issues)", "Last Visit": "2026-02-17"}, {"SITE ID": "AUH3056", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-12-13"}, {"SITE ID": "AUH3086", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-10-08"}, {"SITE ID": "AUH3116", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL conveter faulty Tech 15", "Last Visit": "2026-01-13"}, {"SITE ID": "AUH3163", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need check lamps", "Last Visit": "2025-12-10"}, {"SITE ID": "AUH3211", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-11-25"}, {"SITE ID": "AUH3249", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "neer to check lamp", "Last Visit": "2025-10-03"}, {"SITE ID": "AUH3256", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-09-09"}, {"SITE ID": "AUH3271", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-10-20"}, {"SITE ID": "AUH3316", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-09-26"}, {"SITE ID": "AUH3317", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-09-16"}, {"SITE ID": "AUH3318", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-08-20"}, {"SITE ID": "AUH3329", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL Card not working.", "Last Visit": "2025-12-16"}, {"SITE ID": "AUH3345", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-11-24"}, {"SITE ID": "AUH3372", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "LAMP stby and main faulty", "Last Visit": "2025-12-17"}, {"SITE ID": "AUH3402", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-04-07"}, {"SITE ID": "AUH3440", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-10-20"}, {"SITE ID": "AUH3443", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-11-26"}, {"SITE ID": "AUH3490", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-02-03"}, {"SITE ID": "AUH3512", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor lamp", "Last Visit": "2025-12-08"}, {"SITE ID": "AUH3522", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check up tower", "Last Visit": "2025-10-22"}, {"SITE ID": "AUH3535", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check up tower", "Last Visit": "2025-10-06"}, {"SITE ID": "AUH3540", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check up tower", "Last Visit": "2025-11-25"}, {"SITE ID": "AUH3568", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-10-04"}, {"SITE ID": "AUH3572", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-10-10"}, {"SITE ID": "AUH3577", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-10-28"}, {"SITE ID": "AUH3603", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-12-15"}, {"SITE ID": "AUH3614", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Water tank no AWL", "Last Visit": "2025-11-04"}, {"SITE ID": "AUH3618", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Light not working Need to Check Outdoor End", "Last Visit": "2025-09-26"}, {"SITE ID": "AUH3715", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL lamp faulty 48W", "Last Visit": "2025-12-23"}, {"SITE ID": "AUH3738", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-11-06"}, {"SITE ID": "AUH3801", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor lamp", "Last Visit": "2025-10-24"}, {"SITE ID": "AUH3802", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor lamp", "Last Visit": "2025-12-06"}, {"SITE ID": "AUH3816", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to chek lamp", "Last Visit": "2025-10-24"}, {"SITE ID": "AUH3915", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-02-23"}, {"SITE ID": "AUH6141", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp", "Last Visit": "2025-07-10"}, {"SITE ID": "AUH6326", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check lamp, Solar site", "Last Visit": "2025-10-18"}, {"SITE ID": "AUH6404", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check lamps", "Last Visit": "2025-08-29"}, {"SITE ID": "AUH6407", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-12-03"}, {"SITE ID": "AUH6438", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "2025-11-12"}, {"SITE ID": "AUH6467", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Lmap not working", "Last Visit": "2025-10-16"}, {"SITE ID": "AUH6491", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "check lamp", "Last Visit": "2025-08-22"}, {"SITE ID": "AAN3400", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-10-30"}, {"SITE ID": "AAN3385", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check lamp", "Last Visit": "\u2014"}, {"SITE ID": "AUH4007", "REGION": "AUH", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "\u2014"}, {"SITE ID": "DXB1016", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor.", "Last Visit": "2025-12-10"}, {"SITE ID": "DXB1104", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Photocell faulty.", "Last Visit": "2025-09-25"}, {"SITE ID": "DXB1144", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-11-13"}, {"SITE ID": "DXB1174", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-07-18"}, {"SITE ID": "DXB1210", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFR", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-08-19"}, {"SITE ID": "DXB1231", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-12-15"}, {"SITE ID": "DXB1350", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "MAIN AWL BULB FAULTY NEED TO CHANGE -PALM TREE TOWER", "Last Visit": "2025-12-23"}, {"SITE ID": "DXB1607", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-09-25"}, {"SITE ID": "DXB1706", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFR", "Critical": "No", "Issue if NOK": "ROOFTOP SITE AWL NOT WORKING", "Last Visit": "2025-08-16"}, {"SITE ID": "DXB1765", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor.", "Last Visit": "2025-10-27"}, {"SITE ID": "DXB1768", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-09-12"}, {"SITE ID": "DXB1921", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL PANEL NOT WORKING", "Last Visit": "2025-12-10"}, {"SITE ID": "DXB1977", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL DID NOT INSTATALL", "Last Visit": "2025-12-13"}, {"SITE ID": "DXB2033", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL CONTROL PANEL FAULTY", "Last Visit": "2026-01-21"}, {"SITE ID": "DXB2137", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-09-03"}, {"SITE ID": "DXB2286", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "need to check outdoor", "Last Visit": "2025-12-13"}, {"SITE ID": "DXB2342", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check outdoor", "Last Visit": "2025-07-17"}, {"SITE ID": "DXB2343", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "need to check outdoor", "Last Visit": "2025-09-16"}, {"SITE ID": "DXB2384", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-09-20"}, {"SITE ID": "DXB2462", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL PHOTOCELL FAULTY", "Last Visit": "2026-01-12"}, {"SITE ID": "DXB2506", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-10-16"}, {"SITE ID": "DXB2509", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Site is located inside the company compund and main gate locked.  Need to check from site", "Last Visit": "2025-09-20"}, {"SITE ID": "DXB2601", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-12-03"}, {"SITE ID": "DXB2619", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFR", "Critical": "No", "Issue if NOK": "site Rooftop NO AWL light", "Last Visit": "2026-01-07"}, {"SITE ID": "DXB2620", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "site Rooftop NO AWL light", "Last Visit": "2025-07-29"}, {"SITE ID": "DXB2736", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check in daytime", "Last Visit": "2025-09-30"}, {"SITE ID": "DXB2774", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL BULB FAULTY", "Last Visit": "2026-01-02"}, {"SITE ID": "DXB2803", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor.", "Last Visit": "2025-09-27"}, {"SITE ID": "DXB2805", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-09-20"}, {"SITE ID": "DXB2807", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-11-25"}, {"SITE ID": "DXB2808", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-11-25"}, {"SITE ID": "DXB2864", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor ", "Last Visit": "2025-11-01"}, {"SITE ID": "DXB2998", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-09-25"}, {"SITE ID": "DXT1701", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GRD", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-02-23"}, {"SITE ID": "DXB2127", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-09-15"}, {"SITE ID": "DXB1495", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "RDU", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-10-24"}, {"SITE ID": "DXB2914", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-12-16"}, {"SITE ID": "DXB3482", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "RDU", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-10-16"}, {"SITE ID": "DXB1715", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-11-08"}, {"SITE ID": "AJM2061", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "BOTH AWL BULBS FAULTY - PALM TREE TOWER", "Last Visit": "2025-12-18"}, {"SITE ID": "AJM2188", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check out door.", "Last Visit": "2025-10-11"}, {"SITE ID": "AJM2320", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check out door.", "Last Visit": "2025-08-18"}, {"SITE ID": "AJM2424", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check out door.", "Last Visit": "2025-12-08"}, {"SITE ID": "AJM3030", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor.", "Last Visit": "2025-10-07"}, {"SITE ID": "AJM3046", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check in daytime", "Last Visit": "2025-10-21"}, {"SITE ID": "AJM3386", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor.", "Last Visit": "2025-09-03"}, {"SITE ID": "FUJ2163", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "site on mountain road damage", "Last Visit": "2023-09-09"}, {"SITE ID": "FUJ2165", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL not available", "Last Visit": "2024-01-10"}, {"SITE ID": "FUJ2172", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL not working due  Lamp faulty", "Last Visit": "2025-09-20"}, {"SITE ID": "FUJ2402", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-02-04"}, {"SITE ID": "FUJ2434", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "top lamp need to replace", "Last Visit": "2025-10-13"}, {"SITE ID": "FUJ2468", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Temporarily bypass the faulty photo cell ,Need to be replace the photo cell", "Last Visit": "2025-10-30"}, {"SITE ID": "FUJ2492", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL Photocell faulty", "Last Visit": "2025-11-21"}, {"SITE ID": "FUJ2683", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "The AWL bulb is not working because the AWL card is faulty and needs to be replaced", "Last Visit": "2025-08-23"}, {"SITE ID": "FUJ2689", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check in day time with PM CR", "Last Visit": "2025-10-30"}, {"SITE ID": "FUJ2696", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL is not working. Need to be check", "Last Visit": "2025-11-10"}, {"SITE ID": "FUJ2796", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "located at mountain AWL not working needs to be check.", "Last Visit": "2025-11-18"}, {"SITE ID": "FUJ2824", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Site is located at mountain .Solar power. AWL not working.", "Last Visit": "2025-12-13"}, {"SITE ID": "FUJ2880", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL is not working, Need to be check", "Last Visit": "2025-09-10"}, {"SITE ID": "FUJ2905", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL power suply fulty", "Last Visit": "2025-09-11"}, {"SITE ID": "FUJ2961", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-01-26"}, {"SITE ID": "FUJ3051", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL not working, located at remort mountain area", "Last Visit": "2025-09-29"}, {"SITE ID": "FUJ3261", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-02-24"}, {"SITE ID": "FUJ3403", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL not working, located at mountain", "Last Visit": "2023-08-22"}, {"SITE ID": "FUT3066", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-12-18"}, {"SITE ID": "KFN2612", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL is not working due to card & power supply faulty", "Last Visit": "2025-09-13"}, {"SITE ID": "KFN2617", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL is not working  not rectify  due access issues rod blocked local pepole near to home", "Last Visit": "2025-09-27"}, {"SITE ID": "KFN2630", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check in daytime", "Last Visit": "2026-01-28"}, {"SITE ID": "RAK2860", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "photocell faulty", "Last Visit": "2025-11-21"}, {"SITE ID": "RAK2882", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL is not working at this site due to the TECH-34 control card being faulty, (Bord Weak)\n\nThe TECH-34 card needs to be replaced.", "Last Visit": "2025-12-11"}, {"SITE ID": "RAK3007", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-09-04"}, {"SITE ID": "RAK3358", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Photocell faulty", "Last Visit": "2025-11-10"}, {"SITE ID": "SHJ2052", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Awl not working Awl card issue", "Last Visit": "2025-10-16"}, {"SITE ID": "SHJ2096", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL light not working site Inside Al Montazah Park. Site Access during daytime only.", "Last Visit": "2025-09-22"}, {"SITE ID": "SHJ2195", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-10-14"}, {"SITE ID": "SHJ2272", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-10-23"}, {"SITE ID": "SHJ2273", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-11-19"}, {"SITE ID": "SHJ2298", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-09-18"}, {"SITE ID": "SHJ2346", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-10-30"}, {"SITE ID": "SHJ2359", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-09-18"}, {"SITE ID": "SHJ2473", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Site Visit Update\nVisited the site. The AWL light was not working. Control panel power was ON and checked. Further troubleshooting was carried out by replacing the control card along with the lamp.", "Last Visit": "2025-11-28"}, {"SITE ID": "SHJ3329", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check in daytime", "Last Visit": "2025-08-21"}, {"SITE ID": "SHJ3339", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-12-15"}, {"SITE ID": "SHJ3387", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-10-20"}, {"SITE ID": "SHJ3598", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL PHOTO SELL FAULTY NEED TO REPLACED DON\u2019T HAVE IN CAR KIT", "Last Visit": "2026-01-27"}, {"SITE ID": "SHJ3715", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "LTE AND 5G ALLARM NOT REPORTING AWL ALARM BUT CHECK IN 3G NOT ABLE TO LOGIN", "Last Visit": "2026-02-11"}, {"SITE ID": "SHJ3790", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-09-19"}, {"SITE ID": "SHR2539", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "AWL not working (Main gate locked) Access issue at night", "Last Visit": "2025-10-29"}, {"SITE ID": "SHR2644", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-09-19"}, {"SITE ID": "UAQ2908", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-09-29"}, {"SITE ID": "FUJ2699", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Site loacted at mountain , Need to check in morning", "Last Visit": "2023-08-26"}, {"SITE ID": "SHJ3681", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-11-24"}, {"SITE ID": "FUR5004", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Outdoor Repeater", "Last Visit": "\u2014"}, {"SITE ID": "SHJ3957", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check in daytime", "Last Visit": "2025-10-14"}, {"SITE ID": "KFN3161", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-10-04"}, {"SITE ID": "RAK3770", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-03-13"}, {"SITE ID": "FUJ3574", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "photocell faulty after bypass AWL working needs to be replace photocell.", "Last Visit": "2025-11-15"}, {"SITE ID": "FUJ3915", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL is not working because both the TACH15 card and the power supply are faulty and need to be replaced.", "Last Visit": "2025-09-15"}, {"SITE ID": "SHJ3914", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-02-10"}, {"SITE ID": "SHJ3613", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2025-10-14"}, {"SITE ID": "FUJ3836", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL not working site located mountain needs to be check day time.", "Last Visit": "2025-10-29"}, {"SITE ID": "RAK3521", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-01-19"}, {"SITE ID": "AJM1116", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-12-03"}, {"SITE ID": "RAK3729", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "\u2014", "Last Visit": "2026-02-13"}, {"SITE ID": "KFN1114", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "PHTOCELL NOT WORKING NEED TO CHECK", "Last Visit": "2025-12-24"}, {"SITE ID": "AJM3980", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor.", "Last Visit": "2026-01-07"}, {"SITE ID": "AJM1588", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "AWL not working but flash lights working. Need to check out door", "Last Visit": "2025-11-21"}, {"SITE ID": "SHJ6259", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "No", "Issue if NOK": "Need to check outdoor.", "Last Visit": "\u2014"}, {"SITE ID": "DXB1159", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "Yes", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-10-28"}, {"SITE ID": "DXB1320", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "Yes", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-12-11"}, {"SITE ID": "DXB1752", "REGION": "DXB", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "Yes", "Issue if NOK": "\u2014", "Last Visit": "2025-11-13"}, {"SITE ID": "SHJ3519", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFO", "Critical": "Yes", "Issue if NOK": "Need to check outdoor", "Last Visit": "2025-10-09"}, {"SITE ID": "UAR3126", "REGION": "NE", "SITE CLASS": "Class C", "SITE TYPE": "GFS", "Critical": "Yes", "Issue if NOK": "Both AWL lamps are not working and need to be checked and replaced.", "Last Visit": "2025-12-17"}];
+let filters = { class: 'all', critical: 'all', region: 'all' };
+let sortCol = null, sortDir = 1;
 
-const CLASS_ORDER = ["Class A", "Class B", "Class C"];
-const AGING_ORDER = ["0-7", "8-14", "15-30", "31-60", "60+"];
-let charts = {};
-let openSnagsData = [];
-let coordinatorMonthlyData = [];
-let coordinatorAllTimeData = [];
-let currentFilter = { type: null, value: null };
-
-function csvUrl(sheetName) {
-  return `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
+function setFilter(type, val, btn) {
+  filters[type] = val;
+  btn.closest('.filter-group').querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable();
 }
 
-async function fetchTable(sheetName) {
-  const res = await fetch(csvUrl(sheetName));
-  if (!res.ok) {
-    throw new Error(`Could not fetch "${sheetName}" tab (HTTP ${res.status}). Check the Sheet ID and sharing settings.`);
-  }
-  const text = await res.text();
-  if (text.trim().startsWith("<")) {
-    throw new Error(`"${sheetName}" tab came back as HTML, not CSV — the Sheet is probably not shared as "Anyone with the link can view".`);
-  }
-  const parsed = Papa.parse(text, { header: true, dynamicTyping: true, skipEmptyLines: true });
-  return parsed.data;
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; }
+  document.querySelectorAll('th').forEach(th => th.classList.remove('sorted'));
+  const cols = ['SITE ID','REGION','SITE CLASS','SITE TYPE','Critical','Issue if NOK'];
+  if (HAS_LV) cols.push('Last Visit');
+  const idx = cols.indexOf(col);
+  if (idx >= 0) document.querySelectorAll('th')[idx].classList.add('sorted');
+  renderTable();
 }
 
-function showError(msg) {
-  const banner = document.getElementById("error-banner");
-  banner.textContent = msg;
-  banner.style.display = "block";
-  document.getElementById("loading").style.display = "none";
-}
-
-function clearError() {
-  document.getElementById("error-banner").style.display = "none";
-}
-
-function fmtInt(n) {
-  return (n ?? 0).toLocaleString();
-}
-
-function destroyChart(id) {
-  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
-}
-
-function renderKpis(kpiTotals) {
-  const totalRow = kpiTotals.find(r => r.class === "Total") || {};
-  const row = document.getElementById("kpi-row");
-  const cards = [
-    { label: "Total Sites", value: totalRow.total, cls: "" },
-    { label: "OK", value: totalRow.ok, cls: "accent-green" },
-    { label: "NOT OK (open)", value: totalRow.not_ok, cls: "accent-red", click: "showAllOpenSites()" },
-    { label: "Rectified", value: totalRow.rectified, cls: "accent-amber" },
-    { label: "Access Issue", value: totalRow.access_issue, cls: "" },
-  ];
-  row.innerHTML = cards.map(c => `
-    <div class="kpi ${c.cls}${c.click ? " clickable-kpi" : ""}"${c.click ? ` onclick="${c.click}"` : ""}>
-      <div class="value">${fmtInt(c.value)}</div>
-      <div class="label">${c.label}${c.click ? " \u2192" : ""}</div>
-    </div>
-  `).join("");
-}
-
-function renderRectRates(kpiTotals) {
-  const container = document.getElementById("rect-rate-rows");
-  const rows = kpiTotals.filter(r => CLASS_ORDER.includes(r.class) || r.class === "Total");
-  container.innerHTML = rows.map(r => {
-    const denom = (r.not_ok || 0) + (r.rectified || 0);
-    const pct = denom > 0 ? Math.round((r.rectified / denom) * 100) : 0;
-    return `
-      <div class="rect-bar-row">
-        <div class="rect-bar-label">${r.class}</div>
-        <div class="rect-bar-track"><div class="rect-bar-fill" style="width:${pct}%"></div></div>
-        <div class="rect-bar-pct">${pct}%</div>
-      </div>
-    `;
-  }).join("");
-}
-
-function renderTotalsTable(elId, rows, cols, clickable) {
-  const el = document.getElementById(elId);
-  const headHtml = `<tr><th>Class</th>${cols.map(c => `<th class="num">${c.label}</th>`).join("")}</tr>`;
-  const bodyHtml = rows.map(r => {
-    const isTotal = r.class === "Total";
-    const cls = [isTotal ? "total-row" : "", clickable && !isTotal ? "clickable" : ""].filter(Boolean).join(" ");
-    const click = clickable && !isTotal ? ` onclick="applyFilter('class', ${JSON.stringify(r.class)})"` : "";
-    return `<tr class="${cls}"${click}><td>${r.class}</td>${cols.map(c => `<td class="num">${fmtInt(r[c.key])}</td>`).join("")}</tr>`;
-  }).join("");
-  el.innerHTML = headHtml + bodyHtml;
-}
-
-function renderAgingChart(agingRows) {
-  const byBucket = Object.fromEntries(agingRows.map(r => [r.bucket, r.count]));
-  const data = AGING_ORDER.map(b => byBucket[b] || 0);
-  const colors = ["#2ecc71", "#f0a63a", "#e08a2b", "#d0342c", "#8b1a15"];
-
-  destroyChart("aging");
-  charts.aging = new Chart(document.getElementById("aging-chart"), {
-    type: "bar",
-    data: {
-      labels: AGING_ORDER.map(b => b + " days"),
-      datasets: [{ data, backgroundColor: colors, borderRadius: 4 }],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      onClick: (evt, elements) => {
-        if (elements.length) {
-          applyFilter("bucket", AGING_ORDER[elements[0].index]);
-        }
-      },
-      onHover: (evt, elements) => {
-        evt.native.target.style.cursor = elements.length ? "pointer" : "default";
-      },
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: "#8b93a3", font: { size: 11 } }, grid: { display: false } },
-        y: { ticks: { color: "#8b93a3" }, grid: { color: "#232936" } },
-      },
-    },
+function renderTable() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  let filtered = data.filter(r => {
+    if (filters.class !== 'all' && r['SITE CLASS'] !== filters.class) return false;
+    if (filters.critical !== 'all' && r['Critical'] !== filters.critical) return false;
+    if (filters.region !== 'all' && r['REGION'] !== filters.region) return false;
+    if (search && !r['SITE ID'].toLowerCase().includes(search) && !(r['Issue if NOK']||'').toLowerCase().includes(search)) return false;
+    return true;
   });
+  if (sortCol) filtered.sort((a,b) => (a[sortCol]||'').localeCompare(b[sortCol]||'') * sortDir);
+  document.getElementById('resultCount').innerHTML = `Showing <span>${filtered.length}</span> of <span>${TOTAL}</span>`;
+  const tbody = document.getElementById('tableBody');
+  if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="7" class="no-results">No results match your filters.</td></tr>'; return; }
+  let html = '';
+  if (!sortCol) {
+    const groups = {};
+    filtered.forEach(r => { const k = r['SITE CLASS']; if (!groups[k]) groups[k]=[]; groups[k].push(r); });
+    ['Class A','Class B','Class C'].forEach(cls => {
+      if (!groups[cls]) return;
+      const rows = groups[cls], crit = rows.filter(r => r['Critical']==='Yes').length;
+      html += `<tr class="group-header"><td colspan="7">${cls} &nbsp;·&nbsp; ${rows.length} sites &nbsp;·&nbsp; ${crit} critical</td></tr>`;
+      rows.forEach(r => { html += buildRow(r); });
+    });
+  } else { filtered.forEach(r => { html += buildRow(r); }); }
+  tbody.innerHTML = html;
 }
 
-function renderRegionTable(regionRows) {
-  const el = document.getElementById("region-table");
-  const headHtml = `<tr><th>Region</th><th class="num">Total</th><th class="num">OK</th><th class="num">NOT OK</th><th class="num">Rectified</th></tr>`;
-  const bodyHtml = regionRows.map(r => `
-    <tr class="clickable" onclick="applyFilter('region', ${JSON.stringify(r.region)})">
-      <td>${r.region}</td><td class="num">${fmtInt(r.total)}</td><td class="num">${fmtInt(r.ok)}</td>
-      <td class="num">${fmtInt(r.not_ok)}</td><td class="num">${fmtInt(r.rectified)}</td>
-    </tr>
-  `).join("");
-  el.innerHTML = headHtml + bodyHtml;
+function buildRow(r) {
+  const ck = r['SITE CLASS'].replace('Class ','').toLowerCase();
+  const iss = r['Issue if NOK'];
+  const lvCell = HAS_LV ? `<td><span class="date-text">${r['Last Visit']}</span></td>` : '';
+  return `<tr>
+    <td><span class="site-id">${r['SITE ID']}</span></td>
+    <td><span class="badge-region">${r['REGION']}</span></td>
+    <td><span class="badge badge-${ck}">${r['SITE CLASS']}</span></td>
+    <td><span class="badge-type">${r['SITE TYPE']}</span></td>
+    <td>${r['Critical']==='Yes' ? '<span class="badge badge-crit">⚠ Critical</span>' : '<span class="badge badge-ncrit">Non-Critical</span>'}</td>
+    <td>${(!iss||iss==='—') ? '<span class="issue-text">—</span>' : `<span class="issue-text has-issue">${iss}</span>`}</td>
+    ${lvCell}
+  </tr>`;
 }
-
-function renderRegionRectRates(regionRows) {
-  const container = document.getElementById("region-rect-rows");
-  container.innerHTML = regionRows.map(r => {
-    const denom = (r.not_ok || 0) + (r.rectified || 0);
-    const pct = denom > 0 ? Math.round((r.rectified / denom) * 100) : 0;
-    return `
-      <div class="rect-bar-row">
-        <div class="rect-bar-label">${r.region}</div>
-        <div class="rect-bar-track"><div class="rect-bar-fill" style="width:${pct}%"></div></div>
-        <div class="rect-bar-pct">${pct}%</div>
-      </div>
-    `;
-  }).join("");
-}
-
-function renderRegionCriticalTable(regionRows) {
-  const el = document.getElementById("region-critical-table");
-  const headHtml = `<tr><th>Region</th><th class="num">Critical</th><th class="num">NOT OK</th><th class="num">Rectified</th></tr>`;
-  const bodyHtml = regionRows.map(r => `
-    <tr><td>${r.region}</td><td class="num">${fmtInt(r.critical_total)}</td>
-    <td class="num">${fmtInt(r.critical_not_ok)}</td><td class="num">${fmtInt(r.critical_rectified)}</td></tr>
-  `).join("");
-  el.innerHTML = headHtml + bodyHtml;
-}
-
-function renderCoordinatorChart(rows) {
-  const top = rows.slice(0, 10);
-  destroyChart("coord");
-  charts.coord = new Chart(document.getElementById("coord-chart"), {
-    type: "bar",
-    data: {
-      labels: top.map(r => r.coordinator),
-      datasets: [{ data: top.map(r => r.sites_checked), backgroundColor: "#d0342c", borderRadius: 4 }],
-    },
-    options: {
-      indexAxis: "y",
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: "#8b93a3" }, grid: { color: "#232936" } },
-        y: { ticks: { color: "#e6e9ef", font: { size: 11 } }, grid: { display: false } },
-      },
-    },
-  });
-}
-
-function monthLabel(ym) {
-  const [y, m] = ym.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "short", year: "numeric" });
-}
-
-function populateMonthSelect() {
-  const select = document.getElementById("month-select");
-  const months = [...new Set(coordinatorMonthlyData.map(r => r.month))].sort().reverse();
-  const options = [`<option value="__all__">All Time</option>`]
-    .concat(months.map(m => `<option value="${m}">${monthLabel(m)}</option>`));
-  select.innerHTML = options.join("");
-  select.value = months.length ? months[0] : "__all__";
-}
-
-function coordinatorRowsForMonth(month) {
-  if (month === "__all__") return coordinatorAllTimeData;
-  const rows = coordinatorMonthlyData
-    .filter(r => r.month === month)
-    .map(r => ({ coordinator: r.coordinator, sites_checked: r.sites_checked }))
-    .sort((a, b) => b.sites_checked - a.sites_checked);
-  return rows;
-}
-
-function onMonthChange() {
-  const month = document.getElementById("month-select").value;
-  renderCoordinatorChart(coordinatorRowsForMonth(month));
-}
-
-// ---- drill-down (site-level table) ----
-
-function bucketOfDays(days) {
-  if (days === "" || days === null || days === undefined) return null;
-  if (days <= 7) return "0-7";
-  if (days <= 14) return "8-14";
-  if (days <= 30) return "15-30";
-  if (days <= 60) return "31-60";
-  return "60+";
-}
-
-function applyFilter(type, value) {
-  currentFilter = { type, value };
-  renderDrilldown();
-  const panel = document.getElementById("drilldown-panel");
-  if (panel.scrollIntoView) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
-}
-
-function showAllOpenSites() {
-  applyFilter(null, null);
-}
-
-function clearFilter() {
-  currentFilter = { type: null, value: null };
-  renderDrilldown();
-}
-
-function renderDrilldown() {
-  let rows = openSnagsData;
-  let title = "All Open NOT OK Sites";
-
-  if (currentFilter.type === "class") {
-    rows = rows.filter(r => r.class === currentFilter.value);
-    title = `Open NOT OK Sites — ${currentFilter.value}`;
-  } else if (currentFilter.type === "region") {
-    rows = rows.filter(r => r.region === currentFilter.value);
-    title = `Open NOT OK Sites — Region ${currentFilter.value}`;
-  } else if (currentFilter.type === "bucket") {
-    rows = rows.filter(r => bucketOfDays(r.days_open) === currentFilter.value);
-    title = `Open NOT OK Sites — ${currentFilter.value} days open`;
-  }
-
-  document.getElementById("drilldown-title").textContent = title;
-  document.getElementById("drilldown-count").textContent = `(${rows.length} site${rows.length === 1 ? "" : "s"})`;
-  document.getElementById("drilldown-clear").style.display = currentFilter.type ? "inline-block" : "none";
-
-  const table = document.getElementById("drilldown-table");
-  const empty = document.getElementById("drilldown-empty");
-
-  if (rows.length === 0) {
-    table.innerHTML = "";
-    empty.style.display = "block";
-    return;
-  }
-  empty.style.display = "none";
-
-  const headHtml = `<tr><th>Site ID</th><th>Region</th><th>Class</th><th>Coordinator</th><th class="num">Days Open</th><th>Issue</th></tr>`;
-  const bodyHtml = rows.map(r => {
-    const days = r.days_open;
-    const sevClass = days === "" ? "" : (days > 30 ? "sev-red" : (days > 14 ? "sev-amber" : ""));
-    const badge = r.critical === "Yes" ? '<span class="badge-critical">CRITICAL</span>' : "";
-    return `<tr>
-      <td>${r.site_id}${badge}</td><td>${r.region}</td><td>${r.class}</td><td>${r.coordinator}</td>
-      <td class="num ${sevClass}">${days === "" ? "?" : days}</td><td>${r.issue}</td>
-    </tr>`;
-  }).join("");
-  table.innerHTML = headHtml + bodyHtml;
-}
-
-function renderTrendChart(dayRows) {
-  destroyChart("trend");
-  charts.trend = new Chart(document.getElementById("trend-chart"), {
-    type: "line",
-    data: {
-      labels: dayRows.map(r => r.day),
-      datasets: [
-        { label: "Total Checked", data: dayRows.map(r => r.total), borderColor: "#d0342c", backgroundColor: "transparent", tension: 0.25 },
-        { label: "Class A", data: dayRows.map(r => r["Class A"]), borderColor: "#f0a63a", backgroundColor: "transparent", tension: 0.25 },
-        { label: "Class B", data: dayRows.map(r => r["Class B"]), borderColor: "#2ecc71", backgroundColor: "transparent", tension: 0.25 },
-        { label: "Class C", data: dayRows.map(r => r["Class C"]), borderColor: "#5aa9e6", backgroundColor: "transparent", tension: 0.25 },
-      ],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: "#e6e9ef", font: { size: 11 } } } },
-      scales: {
-        x: { ticks: { color: "#8b93a3", font: { size: 10 } }, grid: { display: false } },
-        y: { ticks: { color: "#8b93a3" }, grid: { color: "#232936" } },
-      },
-    },
-  });
-}
-
-async function loadDashboard() {
-  clearError();
-  try {
-    const [meta, kpiTotals, kpiCritical, regions, coordinators, coordMonthly, aging, dayTrend, openSnags] = await Promise.all([
-      fetchTable("meta"),
-      fetchTable("kpi_totals"),
-      fetchTable("kpi_critical"),
-      fetchTable("region_breakdown"),
-      fetchTable("coordinators"),
-      fetchTable("coordinator_monthly"),
-      fetchTable("aging_open_not_ok"),
-      fetchTable("day_trend"),
-      fetchTable("open_snags"),
-    ]);
-
-    document.getElementById("loading").style.display = "none";
-    document.getElementById("dashboard").style.display = "block";
-
-    document.getElementById("last-updated").textContent =
-      "last updated: " + (meta[0]?.last_updated || "unknown");
-
-    openSnagsData = openSnags;
-    coordinatorMonthlyData = coordMonthly;
-    coordinatorAllTimeData = coordinators;
-
-    renderKpis(kpiTotals);
-    renderRectRates(kpiTotals);
-    renderTotalsTable("kpi-totals-table", kpiTotals,
-      [{ key: "total", label: "Total" }, { key: "ok", label: "OK" },
-       { key: "not_ok", label: "NOT OK" }, { key: "rectified", label: "Rectified" },
-       { key: "access_issue", label: "Access Issue" }], true);
-    renderTotalsTable("kpi-critical-table", kpiCritical,
-      [{ key: "total", label: "Total" }, { key: "ok", label: "OK" },
-       { key: "not_ok", label: "NOT OK" }, { key: "rectified", label: "Rectified" }], false);
-    renderAgingChart(aging);
-    renderRegionTable(regions);
-    renderRegionRectRates(regions);
-    renderRegionCriticalTable(regions);
-    populateMonthSelect();
-    renderCoordinatorChart(coordinatorRowsForMonth(document.getElementById("month-select").value));
-    renderTrendChart(dayTrend);
-    renderDrilldown();
-  } catch (err) {
-    showError(
-      "Couldn't load dashboard data:\n" + err.message +
-      "\n\nCheck: (1) CONFIG.SPREADSHEET_ID is set correctly, " +
-      "(2) the Sheet is shared as \"Anyone with the link can view\", " +
-      "(3) Publish Dashboard has been run at least once from the toolkit."
-    );
-  }
-}
-
-document.getElementById("refresh-btn").addEventListener("click", loadDashboard);
-document.getElementById("month-select").addEventListener("change", onMonthChange);
-document.getElementById("drilldown-clear").addEventListener("click", clearFilter);
-loadDashboard();
-setInterval(loadDashboard, CONFIG.REFRESH_INTERVAL_MINUTES * 60 * 1000);
+renderTable();
 </script>
-
 </body>
 </html>
